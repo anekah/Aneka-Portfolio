@@ -18,6 +18,8 @@ import {
 import { cn } from './lib/utils.ts';
 import { useLocation, useNavigate } from 'react-router-dom';
 
+import { ImmersiveAboutContent } from './components/ImmersiveAboutContent.tsx';
+
 // --- 3D Components ---
 
 function Scene() {
@@ -174,6 +176,22 @@ const SectionLabel = ({ children, className }: { children: React.ReactNode; clas
     </span>
   </div>
 );
+
+const ParallaxCard = ({ children, offset = 50 }: { children: React.ReactNode; offset?: number }) => {
+  const ref = useRef(null);
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ["start end", "end start"]
+  });
+
+  const y = useTransform(scrollYProgress, [0, 1], [offset, -offset]);
+
+  return (
+    <motion.div ref={ref} style={{ y }} className="h-full">
+      {children}
+    </motion.div>
+  );
+};
 
 const ContactForm = () => {
   const [status, setStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
@@ -460,22 +478,14 @@ export default function App() {
           </motion.h1>
           
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-6">
-            <div className="w-full flex flex-col md:flex-row justify-between items-center md:items-start gap-8 md:px-12 lg:px-24 pt-20 md:pt-0">
+            <div className="w-full flex flex-col md:flex-row justify-center items-center gap-8 md:px-12 lg:px-24 pt-20 md:pt-0">
               <motion.div 
-                initial={{ opacity: 0, x: -50, filter: "blur(10px)" }}
-                animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
+                initial={{ opacity: 0, y: 30, filter: "blur(10px)" }}
+                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
                 transition={{ duration: 1.5, ease: [0.22, 1, 0.36, 1], delay: 0.2 }}
-                className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-modern font-black text-black uppercase tracking-tighter text-center md:text-left leading-[0.9]"
+                className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-modern font-black text-black uppercase tracking-tighter text-center leading-[0.9]"
               >
                 Anesu<br/>ishe
-              </motion.div>
-              <motion.div 
-                initial={{ opacity: 0, x: 50, filter: "blur(10px)" }}
-                animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
-                transition={{ duration: 1.5, ease: [0.22, 1, 0.36, 1], delay: 0.4 }}
-                className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-modern font-black text-black uppercase tracking-tighter text-center md:text-right leading-[0.9]"
-              >
-                Muya<br/>mbo
               </motion.div>
             </div>
           </div>
@@ -518,15 +528,7 @@ export default function App() {
                 <ArrowUpRight size={32} />
               </button>
             </div>
-            <div className="space-y-8 text-black/80 text-lg md:text-xl font-medium leading-relaxed">
-              <p className="text-2xl md:text-3xl font-display font-black text-black">Hi, I'm Anesuishe</p>
-              <p>
-                I'm a digital marketing specialist with 4+ years of experience crafting campaigns that drive real results. From SEO and paid media to social strategy and analytics, I bring a full-funnel perspective to every project. 
-              </p>
-              <p>
-                I love turning complex data into clear, actionable insights — and I believe great marketing starts with understanding people.
-              </p>
-            </div>
+            <ImmersiveAboutContent />
 
             <motion.div 
               variants={ANIMATION_VARIANTS.container}
@@ -606,7 +608,9 @@ export default function App() {
                 >
                   <div className="flex justify-between items-end mb-4">
                     <span className="font-modern font-black uppercase tracking-widest text-xs text-black/60 group-hover:text-accent transition-colors">{skill.name}</span>
-                    <span className="font-display font-black text-accent text-xl">{skill.val}%</span>
+                    <span className="font-display font-black text-accent text-xl">
+                      <AnimatedCounter value={skill.val} suffix="%" />
+                    </span>
                   </div>
                   <div className="h-1 w-full bg-accent/5 rounded-full overflow-hidden">
                     <motion.div 
@@ -717,28 +721,29 @@ export default function App() {
                 seed: "beach"
               }
             ].map((project, idx) => (
-              <motion.div 
-                key={idx}
-                variants={ANIMATION_VARIANTS.item}
-                whileHover={{ y: -10, transition: { duration: 0.4 } }}
-                className="bg-white border border-accent/10 rounded-[2rem] overflow-hidden group shadow-lg shadow-accent/5 hover:shadow-xl hover:shadow-accent/10 transition-all duration-500 flex flex-col h-full"
-              >
-                <div className="p-10 flex flex-col h-full">
-                  <div className="mb-6">
-                    <h3 className="text-2xl font-display font-black text-black leading-tight group-hover:text-accent transition-colors">
-                      {project.title.split(' — ')[0]}
-                    </h3>
+              <ParallaxCard key={idx} offset={idx % 2 === 0 ? 30 : 60}>
+                <motion.div 
+                  variants={ANIMATION_VARIANTS.item}
+                  whileHover={{ y: -10, transition: { duration: 0.4 } }}
+                  className="bg-white border border-accent/10 rounded-[2rem] overflow-hidden group shadow-lg shadow-accent/5 hover:shadow-xl hover:shadow-accent/10 transition-all duration-500 flex flex-col h-full"
+                >
+                  <div className="p-10 flex flex-col h-full">
+                    <div className="mb-6">
+                      <h3 className="text-2xl font-display font-black text-black leading-tight group-hover:text-accent transition-colors">
+                        {project.title.split(' — ')[0]}
+                      </h3>
+                    </div>
+                    <p className="text-[11px] font-modern font-black uppercase tracking-[0.3em] text-accent/40 mb-6">{project.tags}</p>
+                    <p className="text-black/60 text-base font-medium leading-relaxed mb-8 flex-grow">
+                      {project.desc}
+                    </p>
+                    <div className="pt-6 border-t border-accent/10 flex justify-between items-center">
+                      <span className="text-[9px] font-modern font-black uppercase tracking-[0.2em] text-black/20">Case Study</span>
+                      <span className="text-[9px] font-modern font-black uppercase tracking-[0.2em] text-accent/40">{project.title.split(' — ')[1]}</span>
+                    </div>
                   </div>
-                  <p className="text-[11px] font-modern font-black uppercase tracking-[0.3em] text-accent/40 mb-6">{project.tags}</p>
-                  <p className="text-black/60 text-base font-medium leading-relaxed mb-8 flex-grow">
-                    {project.desc}
-                  </p>
-                  <div className="pt-6 border-t border-accent/10 flex justify-between items-center">
-                    <span className="text-[9px] font-modern font-black uppercase tracking-[0.2em] text-black/20">Case Study</span>
-                    <span className="text-[9px] font-modern font-black uppercase tracking-[0.2em] text-accent/40">{project.title.split(' — ')[1]}</span>
-                  </div>
-                </div>
-              </motion.div>
+                </motion.div>
+              </ParallaxCard>
             ))}
           </motion.div>
         </div>
@@ -777,7 +782,7 @@ export default function App() {
       <footer className="py-24 bg-[#F8F7F3] border-t border-accent/10">
         <div className="container mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6 text-black/40">
           <div className="text-xs font-modern font-bold tracking-widest uppercase">
-            © 2026 Anesuishe Muyambo
+            © 2026 Anesuishe
           </div>
           <div className="flex gap-12">
             <a href="#" className="text-[10px] uppercase tracking-widest font-bold hover:text-accent transition-colors">Privacy</a>
