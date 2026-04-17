@@ -4,9 +4,7 @@ import { Float, MeshDistortMaterial, Sphere, PerspectiveCamera, Environment, Con
 import { motion, AnimatePresence, useScroll, useTransform, useSpring } from 'motion/react';
 import { 
   ArrowUpRight, 
-  Linkedin, 
   Twitter, 
-  Instagram, 
   Send, 
   Menu, 
   X,
@@ -380,8 +378,7 @@ export default function App() {
           </div>
 
           <div className="absolute bottom-24 left-6 md:left-12 text-black/40 text-[9px] sm:text-[10px] uppercase tracking-[0.4em] font-bold">
-            tg: anesuishe_vl<br/>
-            inst: anesuishe.vl
+            inst: anehmuya
           </div>
         </div>
         
@@ -606,21 +603,6 @@ export default function App() {
               <p className="text-black/60 text-base md:text-lg mb-12 max-w-sm font-medium mx-auto md:mx-0">
                 Let's discuss how we can elevate your brand's digital narrative into something truly unforgettable.
               </p>
-              
-              <div className="flex flex-row md:flex-col justify-center md:justify-start gap-8 md:gap-6">
-                <div className="flex items-center gap-4 text-accent group cursor-pointer">
-                  <div className="w-12 h-12 rounded-full border border-accent/10 flex items-center justify-center group-hover:bg-accent group-hover:text-white transition-all">
-                    <Linkedin className="w-5 h-5" />
-                  </div>
-                  <span className="text-xs uppercase tracking-widest font-black">LinkedIn</span>
-                </div>
-                <div className="flex items-center gap-4 text-accent group cursor-pointer">
-                  <div className="w-12 h-12 rounded-full border border-accent/10 flex items-center justify-center group-hover:bg-accent group-hover:text-white transition-all">
-                    <Instagram className="w-5 h-5" />
-                  </div>
-                  <span className="text-xs uppercase tracking-widest font-black">Instagram</span>
-                </div>
-              </div>
             </div>
 
             <div className="flex-1 w-full relative z-10">
