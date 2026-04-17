@@ -16,6 +16,7 @@ import {
   MousePointer2
 } from 'lucide-react';
 import { cn } from './lib/utils.ts';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 // --- 3D Components ---
 
@@ -288,9 +289,68 @@ const ContactForm = () => {
 };
 
 export default function App() {
+  const { hash } = useLocation();
+  const navigate = useNavigate();
   const shouldReduceMotion = useReducedMotion();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<string | null>(null);
+
   const { scrollY, scrollYProgress } = useScroll();
+
+  // Handle initial deep link scroll
+  useEffect(() => {
+    if (hash) {
+      const id = hash.replace('#', '');
+      const element = document.getElementById(id);
+      if (element) {
+        // Wait a bit for components to mount (esp. 3D canvas)
+        const timeout = setTimeout(() => {
+          element.scrollIntoView({ behavior: 'smooth' });
+        }, 500);
+        return () => clearTimeout(timeout);
+      }
+    }
+  }, [hash]);
+
+  // Deep Link: Update hash as user scrolls
+  useEffect(() => {
+    const sections = ['experience', 'about', 'skills', 'work', 'connect'];
+    const options = {
+      root: null,
+      rootMargin: '0px',
+      threshold: 0.5,
+    };
+
+    const observers = sections.map((id) => {
+      const element = document.getElementById(id);
+      if (!element) return null;
+
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            // Update URL without triggering scroll via React Router
+            window.history.replaceState(null, '', `#${id}`);
+          }
+        });
+      }, options);
+
+      observer.observe(element);
+      return observer;
+    });
+
+    return () => {
+      observers.forEach((observer) => observer?.disconnect());
+    };
+  }, []);
+
+  const copyToClipboard = (id: string) => {
+    const url = `${window.location.origin}${window.location.pathname}#${id}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopyStatus(id);
+      setTimeout(() => setCopyStatus(null), 2000);
+    });
+  };
+
   const scaleX = useSpring(scrollYProgress, {
     stiffness: 100,
     damping: 30,
@@ -446,9 +506,18 @@ export default function App() {
             transition={{ duration: 0.8 }}
             className="max-w-4xl mx-auto"
           >
-            <h2 className="mockup-heading text-6xl sm:text-8xl md:text-[10rem] lg:text-[12rem] text-accent mb-12 md:mb-20 text-center md:text-left">
-              About<br/>Me
-            </h2>
+            <div className="relative group">
+              <h2 className="mockup-heading text-6xl sm:text-8xl md:text-[10rem] lg:text-[12rem] text-accent mb-12 md:mb-20 text-center md:text-left">
+                About<br/>Me
+              </h2>
+              <button 
+                onClick={() => copyToClipboard('about')}
+                className="absolute top-0 -right-4 md:-right-12 opacity-0 group-hover:opacity-100 transition-opacity p-4 text-accent/40 hover:text-accent"
+                title="Copy Deep Link"
+              >
+                <ArrowUpRight size={32} />
+              </button>
+            </div>
             <div className="space-y-8 text-black/80 text-lg md:text-xl font-medium leading-relaxed">
               <p className="text-2xl md:text-3xl font-display font-black text-black">Hi, I'm Anesuishe</p>
               <p>
@@ -495,13 +564,18 @@ export default function App() {
       {/* Skills Section */}
       <section id="skills" className="py-20 md:py-32 bg-[#F8F7F3] border-t border-accent/10">
         <div className="container mx-auto px-6">
-          <motion.h2 
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            className="mockup-heading text-6xl sm:text-8xl md:text-[10rem] lg:text-[12rem] text-accent text-center mb-16 md:mb-24"
-          >
-            Skills
-          </motion.h2>
+          <div className="relative group max-w-fit mx-auto">
+            <h2 className="mockup-heading text-6xl sm:text-8xl md:text-[10rem] lg:text-[12rem] text-accent text-center mb-16 md:mb-24">
+              Skills
+            </h2>
+            <button 
+              onClick={() => copyToClipboard('skills')}
+              className="absolute top-0 -right-8 opacity-0 group-hover:opacity-100 transition-opacity p-4 text-accent/40 hover:text-accent"
+              title="Copy Deep Link"
+            >
+              <ArrowUpRight size={32} />
+            </button>
+          </div>
 
           <motion.div 
             initial={{ opacity: 0, y: 30 }}
@@ -567,9 +641,16 @@ export default function App() {
           <motion.div 
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
-            className="text-center mb-16 md:mb-24"
+            className="text-center mb-16 md:mb-24 relative group max-w-fit mx-auto"
           >
             <h2 className="mockup-heading text-6xl sm:text-8xl md:text-[10rem] lg:text-[12rem] text-accent">Work</h2>
+            <button 
+              onClick={() => copyToClipboard('work')}
+              className="absolute top-0 -right-8 opacity-0 group-hover:opacity-100 transition-opacity p-4 text-accent/40 hover:text-accent"
+              title="Copy Deep Link"
+            >
+              <ArrowUpRight size={32} />
+            </button>
             <p className="text-accent/60 font-modern font-black uppercase tracking-[0.4em] text-xs mt-4">Selected Projects</p>
           </motion.div>
 
@@ -667,10 +748,19 @@ export default function App() {
       <section id="connect" className="py-20 md:py-32 bg-[#F8F7F3] border-t border-accent/10">
         <div className="container mx-auto px-6">
           <div className="bg-white border border-accent/10 p-8 sm:p-12 md:p-24 rounded-[2rem] sm:rounded-[3rem] relative z-10 flex flex-col md:flex-row gap-12 md:gap-16 items-center shadow-xl shadow-accent/5">
-            <div className="flex-1 w-full relative z-10 text-center md:text-left">
-              <h2 className="mockup-heading text-4xl sm:text-6xl md:text-7xl lg:text-8xl text-accent mb-8 leading-[0.9] md:leading-tight">
-                Ready to<br />Transcend?
-              </h2>
+            <div className="flex-1 w-full relative z-10 text-center md:text-left group">
+              <div className="flex items-start justify-between">
+                <h2 className="mockup-heading text-4xl sm:text-6xl md:text-7xl lg:text-8xl text-accent mb-8 leading-[0.9] md:leading-tight">
+                  Ready to<br />Transcend?
+                </h2>
+                <button 
+                  onClick={() => copyToClipboard('connect')}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity p-4 text-accent/40 hover:text-accent"
+                  title="Copy Deep Link"
+                >
+                  <ArrowUpRight size={24} />
+                </button>
+              </div>
               <p className="text-black/60 text-base md:text-lg mb-12 max-w-sm font-medium mx-auto md:mx-0">
                 Let's discuss how we can elevate your brand's digital narrative into something truly unforgettable.
               </p>
@@ -707,6 +797,21 @@ export default function App() {
           translateY: "-50%"
         }}
       />
+
+      {/* Deep Link Toast Notification */}
+      <AnimatePresence>
+        {copyStatus && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, x: "-50%" }}
+            animate={{ opacity: 1, y: 0, x: "-50%" }}
+            exit={{ opacity: 0, y: 20, x: "-50%" }}
+            className="fixed bottom-12 left-1/2 z-[100] px-6 py-3 bg-black text-white rounded-full font-modern font-bold text-[10px] uppercase tracking-widest flex items-center gap-3 shadow-2xl"
+          >
+            <Sparkles size={14} className="text-accent" />
+            Deep link copied to clipboard
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
