@@ -552,7 +552,7 @@ export default function App() {
                 className="col-span-2 lg:col-span-1"
               >
                 <h4 className="text-accent text-5xl sm:text-6xl font-display font-black leading-none mb-3">
-                  R<AnimatedCounter value={250} suffix="k+" />
+                  R<AnimatedCounter value={80} suffix="k+" />
                 </h4>
                 <p className="text-[11px] uppercase tracking-[0.4em] font-black text-black/40">Revenue Generated</p>
               </motion.div>
