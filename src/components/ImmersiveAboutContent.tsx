@@ -3,18 +3,26 @@ import { useRef, useState, useEffect } from 'react';
 import { cn } from '../lib/utils.ts';
 
 const words = [
-  { text: "Hi, I'm ", type: "normal" },
+  { text: "Hi I'm ", type: "normal" },
   { text: "Anesuishe", type: "highlight", color: "text-black font-black" },
-  { text: ". ", type: "normal" },
-  { text: "I'm a ", type: "normal" },
+  { text: " ", type: "normal" },
+  { text: "With over four years of experience as a ", type: "normal" },
   { text: "digital marketing specialist", type: "highlight", color: "text-accent font-bold italic" },
-  { text: " with 4+ years of experience crafting campaigns that drive ", type: "normal" },
-  { text: "real results", type: "highlight", color: "text-black underline decoration-accent/40 decoration-4 underline-offset-4" },
-  { text: ". From SEO and paid media to social strategy and analytics, I bring a ", type: "normal" },
-  { text: "full-funnel perspective", type: "highlight", color: "text-accent font-bold" },
-  { text: " to every project. I love turning complex data into clear, actionable insights — and I believe great marketing starts with ", type: "normal" },
-  { text: "understanding people", type: "highlight", color: "text-black font-black border-b-2 border-accent" },
-  { text: ".", type: "normal" }
+  { text: " I focus on crafting high-impact campaigns that deliver ", type: "normal" },
+  { text: "measurable growth", type: "highlight", color: "text-black underline decoration-accent/40 decoration-4 underline-offset-4" },
+  { text: " My expertise covers the full digital spectrum—from ", type: "normal" },
+  { text: "SEO and paid media", type: "highlight", color: "text-accent font-bold" },
+  { text: " to ", type: "normal" },
+  { text: "sophisticated social strategy", type: "highlight", color: "text-accent font-bold" },
+  { text: " and ", type: "normal" },
+  { text: "data analytics", type: "highlight", color: "text-accent font-bold" },
+  { text: " I excel at bridging the gap between ", type: "normal" },
+  { text: "complex datasets", type: "highlight", color: "text-black font-black" },
+  { text: " and ", type: "normal" },
+  { text: "actionable insights", type: "highlight", color: "text-black font-black" },
+  { text: " driven by the belief that impactful marketing always begins with a ", type: "normal" },
+  { text: "deep understanding of human behavior", type: "highlight", color: "text-black font-black border-b-2 border-accent" },
+  { text: " ", type: "normal" }
 ];
 
 export function ImmersiveAboutContent() {
