@@ -1,20 +1,36 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,100..900;1,9..144,100..900&family=Syne:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap');
+html, body {
+  @apply bg-[#F8F7F3] overflow-x-hidden w-full;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 @import "tailwindcss";
 
 @theme {
   --font-sans: "Inter", sans-serif;
-  --font-display: "Playfair Display", serif;
-  --font-modern: "Outfit", sans-serif;
+  --font-display: "Fraunces", serif;
+  --font-modern: "Syne", sans-serif;
   
   --color-accent: #6D001A;
+  --color-canvas: #F8F7F3;
   --color-glass: rgba(255, 255, 255, 0.03);
   --color-glass-border: rgba(255, 255, 255, 0.08);
 }
 
 @layer base {
   body {
-    @apply bg-black text-neutral-200 antialiased font-sans overflow-x-hidden;
+    @apply bg-neutral-950 text-neutral-200 antialiased font-sans overflow-x-hidden transition-colors duration-500;
   }
+}
+
+.mockup-heading {
+  font-family: var(--font-display);
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: -0.05em;
+  line-height: 0.8;
+  font-variation-settings: "SOFT" 100, "WONK" 1;
 }
 
 ::selection {

@@ -23,11 +23,28 @@ import { cn } from './lib/utils.ts';
 
 function Scene() {
   const sphereRef = useRef<any>(null);
+  const { scrollYProgress } = useScroll();
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+  
+  // Create parallax values for position and rotation
+  const yPos = useTransform(scrollYProgress, [0, 1], [0.5, -5]);
+  const rotationOffset = useTransform(scrollYProgress, [0, 1], [0, Math.PI]);
+  
+  const springY = useSpring(yPos, { stiffness: 100, damping: 30 });
+  const springRotation = useSpring(rotationOffset, { stiffness: 100, damping: 30 });
   
   useFrame((state) => {
     if (sphereRef.current) {
-      sphereRef.current.rotation.x = state.clock.getElapsedTime() * 0.2;
+      sphereRef.current.rotation.x = state.clock.getElapsedTime() * 0.2 + springRotation.get();
       sphereRef.current.rotation.y = state.clock.getElapsedTime() * 0.3;
+      sphereRef.current.position.y = springY.get();
     }
   });
 
@@ -39,7 +56,11 @@ function Scene() {
       <pointLight position={[-10, -10, -10]} intensity={0.5} />
       
       <Float speed={1.5} rotationIntensity={1} floatIntensity={2}>
-        <Sphere ref={sphereRef} args={[1.2, 64, 64]} position={[1.5, 0.5, 0]}>
+        <Sphere 
+          ref={sphereRef} 
+          args={[isMobile ? 0.8 : 1.2, 64, 64]} 
+          position={[isMobile ? 0 : 1.5, 0.5, 0]}
+        >
           <MeshDistortMaterial
             color="#222"
             speed={2}
@@ -66,6 +87,56 @@ function Scene() {
 
 // --- UI Components ---
 
+const AnimatedCounter = ({ value, duration = 2, suffix = "" }: { value: number; duration?: number; suffix?: string }) => {
+  const [count, setCount] = useState(0);
+  const nodeRef = useRef<HTMLSpanElement>(null);
+  const [hasAnimated, setHasAnimated] = useState(false);
+
+  useEffect(() => {
+    if (hasAnimated) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          let start = 0;
+          const end = value;
+          const totalFrames = duration * 60;
+          let frame = 0;
+
+          const counter = setInterval(() => {
+            frame++;
+            const progress = frame / totalFrames;
+            const currentCount = end * progress;
+
+            if (frame === totalFrames) {
+              setCount(end);
+              clearInterval(counter);
+            } else {
+              setCount(currentCount);
+            }
+          }, 1000 / 60);
+
+          setHasAnimated(true);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (nodeRef.current) {
+      observer.observe(nodeRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [value, duration, hasAnimated]);
+
+  return (
+    <span ref={nodeRef} className="tabular-nums">
+      {count % 1 === 0 ? count.toLocaleString() : count.toFixed(1)}
+      {suffix}
+    </span>
+  );
+};
+
 const SectionLabel = ({ children, className }: { children: React.ReactNode; className?: string }) => (
   <div className={cn("flex items-center gap-3 mb-6", className)}>
     <div className="h-[1px] w-8 bg-accent/40" />
@@ -75,75 +146,110 @@ const SectionLabel = ({ children, className }: { children: React.ReactNode; clas
   </div>
 );
 
-const ProjectCard = ({ 
-  title, 
-  category, 
-  description,
-  tags 
-}: { 
-  title: string; 
-  category: string; 
-  description: string;
-  tags: string;
-}) => {
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-  const cardRef = useRef<HTMLDivElement>(null);
+const ContactForm = () => {
+  const [status, setStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
+  const [errorMessage, setErrorMessage] = useState('');
 
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!cardRef.current) return;
-    const rect = cardRef.current.getBoundingClientRect();
-    setMousePos({
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
-    });
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setStatus('sending');
+
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+    formData.append("access_key", "2db9883a-8528-44fa-b715-b21bdd2cdb20");
+
+    try {
+      const response = await fetch("https://api.web3forms.com/submit", {
+        method: "POST",
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setStatus('success');
+        form.reset();
+        setTimeout(() => setStatus('idle'), 5000);
+      } else {
+        setStatus('error');
+        setErrorMessage(data.message || "Failed to send message.");
+      }
+    } catch (error) {
+      setStatus('error');
+      setErrorMessage("Something went wrong. Please try again.");
+    }
   };
 
   return (
-    <motion.div 
-      ref={cardRef}
-      onMouseMove={handleMouseMove}
-      initial={{ opacity: 0, y: 30 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-      className="group relative overflow-hidden rounded-[2rem] glass-panel p-8 md:p-10 h-[400px] md:h-[450px] flex flex-col justify-between transition-all duration-500 hover:border-white/20 active:scale-[0.98]"
-    >
-      {/* Liquid Glass Effect overlay */}
-      <div 
-        className="absolute inset-0 z-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"
-        style={{
-          background: `radial-gradient(600px circle at ${mousePos.x}px ${mousePos.y}px, rgba(255,255,255,0.06), transparent 40%)`
-        }}
-      />
+    <form className="space-y-6" onSubmit={handleSubmit}>
+      <div className="space-y-2">
+        <label className="text-[10px] uppercase tracking-widest font-bold text-accent/40 ml-4">Full Name</label>
+        <input 
+          name="name"
+          type="text" 
+          required
+          placeholder="E.g. Alexander Knight"
+          className="w-full h-16 px-8 rounded-full bg-accent/5 border border-accent/10 text-black placeholder:text-black/20 focus:outline-none focus:border-accent/30 transition-colors"
+        />
+      </div>
+      <div className="space-y-2">
+        <label className="text-[10px] uppercase tracking-widest font-bold text-accent/40 ml-4">Email Address</label>
+        <input 
+          name="email"
+          type="email" 
+          required
+          placeholder="alex@studio.com"
+          className="w-full h-16 px-8 rounded-full bg-accent/5 border border-accent/10 text-black placeholder:text-black/20 focus:outline-none focus:border-accent/30 transition-colors"
+        />
+      </div>
+      <div className="space-y-2">
+        <label className="text-[10px] uppercase tracking-widest font-bold text-accent/40 ml-4">Brief Narrative</label>
+        <textarea 
+          name="message"
+          required
+          placeholder="Tell me about your vision..."
+          className="w-full h-40 px-8 py-6 rounded-3xl bg-accent/5 border border-accent/10 text-black placeholder:text-black/20 focus:outline-none focus:border-accent/30 transition-colors resize-none"
+        />
+      </div>
       
-      <div className="relative z-10">
-        <div className="flex justify-between items-start mb-12">
-          <span className="text-[10px] uppercase tracking-[0.3em] font-bold text-neutral-500 group-hover:text-white/60 transition-colors">
-            {category}
-          </span>
-          <motion.div 
-            whileHover={{ rotate: 45, scale: 1.2 }}
-            className="w-12 h-12 rounded-full border border-white/5 flex items-center justify-center group-hover:border-accent/40 group-hover:bg-accent text-white transition-all duration-500"
-          >
-            <ArrowUpRight size={20} />
-          </motion.div>
-        </div>
-        
-        <h3 className="text-3xl md:text-4xl font-display italic text-white mb-6 group-hover:translate-x-2 transition-transform duration-500 ease-out">
-          {title}
-        </h3>
-        <p className="text-neutral-400 text-sm md:text-base font-light leading-relaxed max-w-sm group-hover:text-neutral-300 transition-colors duration-500">
-          {description}
-        </p>
-      </div>
+      <div className="relative">
+        <motion.button 
+          disabled={status === 'sending'}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          type="submit"
+          className={cn(
+            "w-full h-16 rounded-full font-modern font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 transition-all",
+            status === 'sending' ? "bg-neutral-200 text-neutral-400 cursor-not-allowed" : "bg-accent text-white shadow-lg shadow-accent/20 hover:shadow-xl hover:shadow-accent/30"
+          )}
+        >
+          {status === 'sending' ? "Transmitting..." : "Send Inquiry"} <Send size={16} />
+        </motion.button>
 
-      <div className="relative z-10 mt-auto">
-        <div className="h-[1px] w-full bg-white/5 group-hover:bg-white/10 mb-6 transition-colors" />
-        <span className="text-[11px] font-modern font-bold uppercase tracking-widest text-neutral-600 group-hover:text-neutral-400 transition-colors">
-          {tags}
-        </span>
+        <AnimatePresence>
+          {status === 'success' && (
+            <motion.p 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="absolute -bottom-8 left-0 right-0 text-center text-[10px] uppercase tracking-widest font-bold text-green-600"
+            >
+              Success! Your narrative has been received.
+            </motion.p>
+          )}
+          {status === 'error' && (
+            <motion.p 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="absolute -bottom-8 left-0 right-0 text-center text-[10px] uppercase tracking-widest font-bold text-accent"
+            >
+              {errorMessage}
+            </motion.p>
+          )}
+        </AnimatePresence>
       </div>
-    </motion.div>
+    </form>
   );
 };
 
@@ -177,24 +283,24 @@ export default function App() {
       />
 
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 w-full z-50 px-6 py-8 md:px-12 flex justify-between items-center bg-transparent mix-blend-difference">
+      <nav className="fixed top-0 left-0 w-full z-50 px-6 py-8 md:px-12 flex justify-between items-center bg-transparent">
         <motion.div 
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
-          className="text-xl font-modern font-bold tracking-tight text-white cursor-pointer"
+          className="text-xl font-modern font-black tracking-tighter text-accent cursor-pointer"
         >
-          ANESUISHE.
+          Anesuishe.
         </motion.div>
         
         <div className="hidden md:flex gap-12 items-center">
-          {['Experience', 'Work', 'Skills', 'Connect'].map((item, idx) => (
+          {['About', 'Skills', 'Work', 'Connect'].map((item, idx) => (
             <motion.a 
               key={item}
               href={`#${item.toLowerCase()}`}
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.1 }}
-              className="text-[11px] uppercase tracking-[0.2em] font-medium text-white/70 hover:text-white transition-colors"
+              className="text-[10px] uppercase tracking-[0.3em] font-black text-accent/60 hover:text-accent transition-colors"
             >
               {item}
             </motion.a>
@@ -203,7 +309,7 @@ export default function App() {
 
         <button 
           onClick={() => setIsMenuOpen(!isMenuOpen)}
-          className="md:hidden text-white p-2"
+          className="md:hidden text-accent p-2"
         >
           {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
@@ -213,17 +319,17 @@ export default function App() {
       <AnimatePresence>
         {isMenuOpen && (
           <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="fixed inset-0 z-[49] bg-neutral-950 flex flex-col items-center justify-center gap-8 md:hidden p-6 pt-32"
+            initial={{ opacity: 0, scale: 1.1 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="fixed inset-0 z-[49] bg-[#F8F7F3] flex flex-col items-center justify-center gap-12 md:hidden p-6"
           >
-            {['Experience', 'Work', 'Skills', 'Connect'].map((item) => (
+            {['About', 'Skills', 'Work', 'Connect'].map((item) => (
               <a 
                 key={item}
                 href={`#${item.toLowerCase()}`}
                 onClick={() => setIsMenuOpen(false)}
-                className="text-5xl font-modern font-bold text-white hover:text-neutral-400 transition-all duration-300 hover:tracking-widest"
+                className="mockup-heading text-6xl text-accent hover:tracking-widest transition-all duration-500"
               >
                 {item}
               </a>
@@ -233,8 +339,8 @@ export default function App() {
       </AnimatePresence>
 
       {/* Hero Section */}
-      <section id="experience" className="relative h-screen flex items-center justify-center overflow-hidden">
-        <div className="absolute inset-0 z-0">
+      <section id="experience" className="relative h-screen flex items-center justify-center overflow-hidden bg-[#F8F7F3]">
+        <div className="absolute inset-0 z-0 opacity-40">
           <Canvas>
             <Suspense fallback={null}>
               <Scene />
@@ -242,215 +348,130 @@ export default function App() {
           </Canvas>
         </div>
 
-        <div className="container mx-auto px-6 relative z-10 grid md:grid-cols-2 gap-12 items-center">
-          <motion.div
-            initial={{ opacity: 0, x: -50 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
+        <div className="container mx-auto px-6 relative z-10 flex flex-col items-center">
+          <motion.h1 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+            className="mockup-heading text-[18vw] leading-[0.7] text-accent text-center pointer-events-none opacity-20 md:opacity-100"
           >
-            <SectionLabel>Digital Specialist</SectionLabel>
-            <h1 className="text-6xl md:text-8xl lg:text-[10rem] font-display italic leading-[0.85] text-white text-glow mb-8 -ml-1 md:-ml-4">
-              Strategic <br /> <span className="not-italic font-bold font-modern">Vision.</span>
-            </h1>
-            <p className="max-w-md text-neutral-400 text-lg md:text-xl leading-relaxed font-light mb-12">
-              Transforming brands through immersive storytelling and data-driven intelligence. Creating digital landscapes that leave a lasting imprint.
-            </p>
-            <div className="flex gap-6 items-center">
-              <motion.button 
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="px-8 py-4 bg-accent text-white font-modern font-bold uppercase tracking-wider text-xs rounded-full flex items-center gap-3 transition-all shadow-[0_0_30px_rgba(109,0,26,0.3)]"
+            Portfolio
+          </motion.h1>
+          
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-6">
+            <div className="w-full flex flex-col md:flex-row justify-between items-center md:items-start gap-8 md:px-12 lg:px-24 pt-20 md:pt-0">
+              <motion.div 
+                initial={{ opacity: 0, x: -50 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.5, duration: 1 }}
+                className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-modern font-black text-black uppercase tracking-tighter text-center md:text-left leading-[0.9]"
               >
-                Launch Experience <ChevronRight size={16} />
-              </motion.button>
-              <div className="h-10 w-[1px] bg-neutral-800" />
-              <div className="flex gap-4">
-                <Linkedin className="w-5 h-5 text-neutral-500 hover:text-white cursor-pointer transition-colors" />
-                <Twitter className="w-5 h-5 text-neutral-500 hover:text-white cursor-pointer transition-colors" />
-              </div>
+                Anesu<br/>ishe
+              </motion.div>
+              <motion.div 
+                initial={{ opacity: 0, x: 50 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.7, duration: 1 }}
+                className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-modern font-black text-black uppercase tracking-tighter text-center md:text-right leading-[0.9]"
+              >
+                Muya<br/>mbo
+              </motion.div>
             </div>
-          </motion.div>
+          </div>
+
+          <div className="absolute bottom-24 left-6 md:left-12 text-black/40 text-[9px] sm:text-[10px] uppercase tracking-[0.4em] font-bold">
+            tg: anesuishe_vl<br/>
+            inst: anesuishe.vl
+          </div>
         </div>
         
         <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-4">
-           <span className="text-[10px] uppercase tracking-[0.3em] font-medium text-neutral-500">Scroll</span>
-           <div className="w-[1px] h-12 bg-neutral-800 relative overflow-hidden">
+           <div className="w-[1px] h-12 bg-accent/20 relative overflow-hidden">
               <motion.div 
                 animate={{ y: [0, 48] }}
                 transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-                className="absolute top-0 left-0 w-full h-1/2 bg-accent shadow-[0_0_10px_rgba(109,0,26,1)]" 
+                className="absolute top-0 left-0 w-full h-1/2 bg-accent" 
               />
            </div>
         </div>
       </section>
 
       {/* About Section */}
-      <section id="about" className="py-32 bg-neutral-950">
+      <section id="about" className="py-24 md:py-40 bg-[#F8F7F3]">
         <div className="container mx-auto px-6">
-          <div className="grid md:grid-cols-2 gap-24 items-center">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              className="aspect-square relative flex items-center justify-center"
-            >
-              <div className="absolute inset-0 bg-neutral-900/50 rounded-full blur-[100px]" />
-              <div className="relative w-full h-full overflow-hidden rounded-3xl grayscale hover:grayscale-0 transition-all duration-700">
-                <img 
-                  src="https://picsum.photos/seed/anesuishe/800/800" 
-                  alt="Personality" 
-                  className="w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
-                />
-              </div>
-            </motion.div>
-            
-              <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-100px" }}
-                transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-              >
-                <SectionLabel>About the Craft</SectionLabel>
-                <h2 className="text-4xl md:text-5xl font-display italic text-white mb-8">
-                  Human insights, <br /> driven by <span className="not-italic">precision.</span>
-                </h2>
-                <div className="space-y-6 text-neutral-400 text-lg font-light leading-relaxed">
-                  <p>
-                    As a digital marketing architect, I believe every click tells a story. My approach bridges the gap between raw data and emotional connection, ensuring your brand doesn't just reach people—it resonates.
-                  </p>
-                  <p>
-                    With 4+ years of specialized experience in SEO, paid media, and brand strategy, I focus on the "why" behind the conversion.
-                  </p>
-                </div>
-                
-                <div className="mt-12 grid grid-cols-2 gap-8">
-                  <motion.div
-                    initial={{ opacity: 0, x: -20 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: 0.3, duration: 0.6 }}
-                  >
-                    <h4 className="text-accent text-2xl font-bold mb-2">4+ Years</h4>
-                    <p className="text-sm text-neutral-500 uppercase tracking-widest">Experience</p>
-                  </motion.div>
-                  <motion.div
-                    initial={{ opacity: 0, x: -20 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: 0.4, duration: 0.6 }}
-                  >
-                    <h4 className="text-accent text-2xl font-bold mb-2">50+ Projects</h4>
-                    <p className="text-sm text-neutral-500 uppercase tracking-widest">Delivered</p>
-                  </motion.div>
-                </div>
-              </motion.div>
-          </div>
-        </div>
-      </section>
-
-      {/* Work Section */}
-      <section id="work" className="py-32 relative overflow-hidden">
-        <div className="container mx-auto px-6">
-          <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-6">
-            <div>
-              <SectionLabel>Case Studies</SectionLabel>
-              <h2 className="text-4xl md:text-6xl font-display italic text-white">Immersive <span className="not-italic">Results.</span></h2>
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.8 }}
+            className="max-w-4xl mx-auto"
+          >
+            <h2 className="mockup-heading text-6xl sm:text-8xl md:text-[10rem] lg:text-[12rem] text-accent mb-12 md:mb-20 text-center md:text-left">
+              About<br/>Me
+            </h2>
+            <div className="space-y-8 text-black/80 text-lg md:text-xl font-medium leading-relaxed">
+              <p className="text-2xl md:text-3xl font-display font-black text-black">Hi, I'm Anesuishe</p>
+              <p>
+                I'm a digital marketing specialist with 4+ years of experience crafting campaigns that drive real results. From SEO and paid media to social strategy and analytics, I bring a full-funnel perspective to every project. 
+              </p>
+              <p>
+                I love turning complex data into clear, actionable insights — and I believe great marketing starts with understanding people.
+              </p>
             </div>
-            <p className="max-w-xs text-neutral-500 text-sm italic py-2 md:py-0">
-              A curated selection of transformations that redefined digital presence.
-            </p>
-          </div>
 
-          <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
-            {[
-              {
-                title: "Woolworths SA",
-                category: "Social Campaign",
-                description: "Seasonal social media campaign for Woolworths SA's Cape Town stores, driving a 38% increase in foot traffic through Meta Ads and influencer partnerships.",
-                tags: "Meta Ads · Social Media"
-              },
-              {
-                title: "Yoco",
-                category: "SEO & Content",
-                description: "Revamped Yoco's blog and SEO architecture, growing organic search visibility by 210% and reducing paid acquisition costs over 5 months.",
-                tags: "SEO · Content Strategy"
-              },
-              {
-                title: "Kauai",
-                category: "Email Marketing",
-                description: "Redesigned Kauai's email funnel with segmented automations and A/B tested copy, lifting open rates from 18% to 41%.",
-                tags: "Email · Automation"
-              },
-              {
-                title: "Naspers",
-                category: "Paid Media",
-                description: "Multi-platform Google and Meta paid media strategy for a Naspers digital product launch, achieving a 3.2x ROAS within the first quarter.",
-                tags: "Google Ads · Paid Media"
-              },
-              {
-                title: "Sealand Gear",
-                category: "Brand Awareness",
-                description: "Digital brand awareness campaign for Cape Town's sustainable gear brand Sealand, growing Instagram following by 9k and boosting sales by 55%.",
-                tags: "Branding · Social Media"
-              },
-              {
-                title: "Luno",
-                category: "Growth Funnel",
-                description: "Full-funnel digital strategy for Luno's Cape Town user acquisition drive, reducing cost-per-signup by 34% through landing page testing and targeted ads.",
-                tags: "Funnel · A/B Testing"
-              },
-              {
-                title: "Codfather",
-                category: "Digital Overhaul",
-                description: "Rebuilt the online presence for Camps Bay's iconic heritage restaurant, launching local SEO campaigns that drove a 47% uplift in reservation bookings.",
-                tags: "SEO · Google Ads"
-              },
-              {
-                title: "Bo-Vine Wine & Grill",
-                category: "Social Growth",
-                description: "Managed complete content strategy for Bo-Vine on the Camps Bay Promenade, increasing weekend covers through targeted paid promotions.",
-                tags: "Social Media · Meta Ads"
-              },
-              {
-                title: "Café Caprice",
-                category: "Influencer",
-                description: "Coordinated micro-influencer and email marketing drive, boosting Sunday brunch bookings by 62% during the peak summer season.",
-                tags: "Influencer · Email Marketing"
-              }
-            ].map((project, idx) => (
-              <ProjectCard 
-                key={project.title}
-                title={project.title}
-                category={project.category}
-                description={project.description}
-                tags={project.tags}
-              />
-            ))}
-          </div>
+            <div className="mt-24 pt-16 border-t border-accent/10 grid grid-cols-2 lg:grid-cols-3 gap-12 md:gap-16">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.2 }}
+              >
+                <h4 className="text-accent text-5xl sm:text-6xl font-display font-black leading-none mb-3">
+                  <AnimatedCounter value={50} suffix="+" />
+                </h4>
+                <p className="text-[11px] uppercase tracking-[0.4em] font-black text-black/40">Brands Scaled</p>
+              </motion.div>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.3 }}
+              >
+                <h4 className="text-accent text-5xl sm:text-6xl font-display font-black leading-none mb-3">
+                  <AnimatedCounter value={3.2} suffix="x" />
+                </h4>
+                <p className="text-[11px] uppercase tracking-[0.4em] font-black text-black/40">Average ROAS</p>
+              </motion.div>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.4 }}
+                className="col-span-2 lg:col-span-1"
+              >
+                <h4 className="text-accent text-5xl sm:text-6xl font-display font-black leading-none mb-3">
+                  <AnimatedCounter value={100} suffix="k+" />
+                </h4>
+                <p className="text-[11px] uppercase tracking-[0.4em] font-black text-black/40">Revenue Generated</p>
+              </motion.div>
+            </div>
+          </motion.div>
         </div>
       </section>
 
       {/* Skills Section */}
-      <section id="skills" className="py-32 bg-neutral-950">
+      <section id="skills" className="py-20 md:py-32 bg-[#F8F7F3] border-t border-accent/10">
         <div className="container mx-auto px-6">
-          <motion.div 
-            initial={{ opacity: 0, y: 40 }}
+          <motion.h2 
+            initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-100px" }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
-            className="mb-16"
+            className="mockup-heading text-6xl sm:text-8xl md:text-[10rem] lg:text-[12rem] text-accent text-center mb-16 md:mb-24"
           >
-            <SectionLabel>Expertise</SectionLabel>
-            <h2 className="text-4xl md:text-6xl font-display italic text-white mb-4">
-              What I <span className="not-italic">Bring.</span>
-            </h2>
-            <p className="text-neutral-500 max-w-lg">
-              A comprehensive stack of digital capabilities designed to scale brands and dominate market landscapes.
-            </p>
-          </motion.div>
+            Skills
+          </motion.h2>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-w-6xl mx-auto">
+            <p className="col-span-full mockup-heading text-2xl text-accent mb-8">What I Bring</p>
             {[
               "SEO / SEM",
               "Google Ads",
@@ -463,111 +484,162 @@ export default function App() {
               "Marketing Auto.",
               "A/B Testing",
               "Brand Strategy",
-              "Social Media Mgmt",
-            ].map((skill, idx) => (
-              <motion.div
-                key={skill}
+              "Social Media Management"
+            ].map(skill => (
+              <div key={skill} className="bg-white border border-accent/10 py-6 px-8 rounded-2xl font-modern font-bold uppercase tracking-widest text-[11px] text-accent hover:bg-accent hover:text-white transition-all duration-300 cursor-default">
+                {skill}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Work Section */}
+      <section id="work" className="py-20 md:py-32 bg-[#F8F7F3] border-t border-accent/10">
+        <div className="container mx-auto px-6">
+          <motion.div 
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            className="text-center mb-16 md:mb-24"
+          >
+            <h2 className="mockup-heading text-6xl sm:text-8xl md:text-[10rem] lg:text-[12rem] text-accent">Work</h2>
+            <p className="text-accent/60 font-modern font-black uppercase tracking-[0.4em] text-xs mt-4">Selected Projects</p>
+          </motion.div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
+            {[
+              {
+                title: "Woolworths SA — Social Campaign",
+                desc: "Seasonal social media campaign for Woolworths SA's Cape Town stores, driving a 38% increase in foot traffic through Meta Ads and influencer partnerships.",
+                tags: "Meta Ads · Social Media",
+                seed: "fashion"
+              },
+              {
+                title: "Yoco — SEO & Content Strategy",
+                desc: "Revamped Yoco's blog and SEO architecture, growing organic search visibility by 210% and reducing paid acquisition costs over 5 months.",
+                tags: "SEO · Content Strategy",
+                seed: "tech"
+              },
+              {
+                title: "Kauai — Email Marketing Overhaul",
+                desc: "Redesigned Kauai's email funnel with segmented automations and A/B tested copy, lifting open rates from 18% to 41%.",
+                tags: "Email · Automation",
+                seed: "coffee"
+              },
+              {
+                title: "Naspers — Paid Media Strategy",
+                desc: "Multi-platform Google and Meta paid media strategy for a Naspers digital product launch, achieving a 3.2x ROAS within the first quarter.",
+                tags: "Google Ads · Paid Media",
+                seed: "corporate"
+              },
+              {
+                title: "Sealand Gear — Brand Awareness",
+                desc: "Digital brand awareness campaign for Cape Town's sustainable gear brand Sealand, growing Instagram following by 9k and boosting sales by 55%.",
+                tags: "Branding · Social Media",
+                seed: "gear"
+              },
+              {
+                title: "Luno — Crypto Onboarding Funnel",
+                desc: "Full-funnel digital strategy for Luno's Cape Town user acquisition drive, reducing cost-per-signup by 34% through landing page testing and targeted ads.",
+                tags: "Funnel · A/B Testing",
+                seed: "crypto"
+              },
+              {
+                title: "Codfather — Digital Presence Revamp",
+                desc: "Rebuilt the online presence for Camps Bay's iconic seafood restaurant Codfather, launching a new Google Ads strategy and local SEO campaign that drove a 47% uplift in reservation bookings.",
+                tags: "SEO · Google Ads",
+                seed: "seafood"
+              },
+              {
+                title: "Bo-Vine Wine & Grill — Social Growth",
+                desc: "Managed Instagram and Facebook content strategy for Bo-Vine on the Camps Bay Promenade, growing their social following by 6.2k and increasing weekend covers through targeted paid promotions.",
+                tags: "Social Media · Meta Ads",
+                seed: "wine"
+              },
+              {
+                title: "Café Caprice — Influencer Campaign",
+                desc: "Coordinated a micro-influencer and email marketing campaign for Camps Bay's beloved Café Caprice, boosting Sunday brunch bookings by 62% during the summer season.",
+                tags: "Influencer · Email Marketing",
+                seed: "beach"
+              }
+            ].map((project, idx) => (
+              <motion.div 
+                key={idx}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ delay: idx * 0.05 }}
-                whileHover={{ scale: 1.02 }}
-                className="p-6 glass-panel rounded-2xl flex items-center gap-4 group transition-all duration-300 hover:bg-white/5 active:scale-95"
+                transition={{ delay: idx * 0.1 }}
+                className="bg-white border border-accent/10 rounded-[2rem] overflow-hidden group shadow-lg shadow-accent/5 hover:shadow-xl hover:shadow-accent/10 transition-all duration-500 flex flex-col h-full"
               >
-                <div className="w-2 h-2 rounded-full bg-neutral-700 group-hover:bg-accent transition-colors" />
-                <span className="text-sm font-modern font-medium text-neutral-300 group-hover:text-white">
-                  {skill}
-                </span>
+                <div className="p-10 flex flex-col h-full">
+                  <div className="mb-6 flex items-start justify-between">
+                    <h3 className="text-2xl font-display font-black text-black leading-tight group-hover:text-accent transition-colors">
+                      {project.title.split(' — ')[0]}
+                    </h3>
+                    <div className="w-10 h-10 rounded-full border border-accent/10 flex items-center justify-center group-hover:bg-accent group-hover:text-white transition-all">
+                      <ArrowUpRight size={20} />
+                    </div>
+                  </div>
+                  <p className="text-[11px] font-modern font-black uppercase tracking-[0.3em] text-accent/40 mb-6">{project.tags}</p>
+                  <p className="text-black/60 text-base font-medium leading-relaxed mb-8 flex-grow">
+                    {project.desc}
+                  </p>
+                  <div className="pt-6 border-t border-accent/10 flex justify-between items-center">
+                    <span className="text-[9px] font-modern font-black uppercase tracking-[0.2em] text-black/20">Case Study</span>
+                    <span className="text-[9px] font-modern font-black uppercase tracking-[0.2em] text-accent/40">{project.title.split(' — ')[1]}</span>
+                  </div>
+                </div>
               </motion.div>
             ))}
           </div>
         </div>
       </section>
 
-      <section id="approach" className="hidden">
-        {/* Methodology section removed as per user request */}
-      </section>
-
       {/* Contact Section */}
-      <section id="connect" className="py-32 relative overflow-hidden">
+      <section id="connect" className="py-20 md:py-32 bg-[#F8F7F3] border-t border-accent/10">
         <div className="container mx-auto px-6">
-          <div className="glass-panel p-12 md:p-24 rounded-[3rem] relative z-10 overflow-hidden flex flex-col md:flex-row gap-16 items-center">
-            <div className="absolute inset-0 z-0 opacity-20 pointer-events-none">
-                <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 blur-[100px] rounded-full" />
-                <div className="absolute bottom-0 left-0 w-96 h-96 bg-white/5 blur-[100px] rounded-full" />
-            </div>
-
-            <div className="flex-1 relative z-10">
-              <SectionLabel>Connect</SectionLabel>
-              <h2 className="text-5xl md:text-7xl font-display italic text-white mb-8">Ready to <br /> <span className="not-italic">transcend?</span></h2>
-              <p className="text-neutral-400 text-lg mb-12 max-w-sm">
+          <div className="bg-white border border-accent/10 p-8 sm:p-12 md:p-24 rounded-[2rem] sm:rounded-[3rem] relative z-10 flex flex-col md:flex-row gap-12 md:gap-16 items-center shadow-xl shadow-accent/5">
+            <div className="flex-1 w-full relative z-10 text-center md:text-left">
+              <h2 className="mockup-heading text-4xl sm:text-6xl md:text-7xl lg:text-8xl text-accent mb-8 leading-[0.9] md:leading-tight">
+                Ready to<br />Transcend?
+              </h2>
+              <p className="text-black/60 text-base md:text-lg mb-12 max-w-sm font-medium mx-auto md:mx-0">
                 Let's discuss how we can elevate your brand's digital narrative into something truly unforgettable.
               </p>
               
-              <div className="flex flex-col gap-6">
-                <div className="flex items-center gap-4 text-white group cursor-pointer">
-                  <div className="w-12 h-12 rounded-full border border-neutral-800 flex items-center justify-center group-hover:border-white transition-colors">
+              <div className="flex flex-row md:flex-col justify-center md:justify-start gap-8 md:gap-6">
+                <div className="flex items-center gap-4 text-accent group cursor-pointer">
+                  <div className="w-12 h-12 rounded-full border border-accent/10 flex items-center justify-center group-hover:bg-accent group-hover:text-white transition-all">
                     <Linkedin className="w-5 h-5" />
                   </div>
-                  <span className="text-sm uppercase tracking-widest font-medium">LinkedIn</span>
+                  <span className="text-xs uppercase tracking-widest font-black">LinkedIn</span>
                 </div>
-                <div className="flex items-center gap-4 text-white group cursor-pointer">
-                  <div className="w-12 h-12 rounded-full border border-neutral-800 flex items-center justify-center group-hover:border-white transition-colors">
+                <div className="flex items-center gap-4 text-accent group cursor-pointer">
+                  <div className="w-12 h-12 rounded-full border border-accent/10 flex items-center justify-center group-hover:bg-accent group-hover:text-white transition-all">
                     <Instagram className="w-5 h-5" />
                   </div>
-                  <span className="text-sm uppercase tracking-widest font-medium">Instagram</span>
+                  <span className="text-xs uppercase tracking-widest font-black">Instagram</span>
                 </div>
               </div>
             </div>
 
             <div className="flex-1 w-full relative z-10">
-              <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
-                <div className="space-y-2">
-                  <label className="text-[10px] uppercase tracking-widest font-bold text-neutral-500 ml-4">Full Name</label>
-                  <input 
-                    type="text" 
-                    placeholder="E.g. Alexander Knight"
-                    className="w-full h-16 px-8 rounded-full bg-white/5 border border-white/10 text-white placeholder:text-neutral-700 focus:outline-none focus:border-white/30 transition-colors"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] uppercase tracking-widest font-bold text-neutral-500 ml-4">Email Address</label>
-                  <input 
-                    type="email" 
-                    placeholder="alex@studio.com"
-                    className="w-full h-16 px-8 rounded-full bg-white/5 border border-white/10 text-white placeholder:text-neutral-700 focus:outline-none focus:border-white/30 transition-colors"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] uppercase tracking-widest font-bold text-neutral-500 ml-4">Brief Narrative</label>
-                  <textarea 
-                    placeholder="Tell me about your vision..."
-                    className="w-full h-40 px-8 py-6 rounded-3xl bg-white/5 border border-white/10 text-white placeholder:text-neutral-700 focus:outline-none focus:border-white/30 transition-colors resize-none"
-                  />
-                </div>
-                <motion.button 
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="w-full h-16 bg-accent text-white rounded-full font-modern font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-3 shadow-[0_0_30px_rgba(109,0,26,0.3)] hover:shadow-[0_0_40px_rgba(109,0,26,0.5)] transition-all"
-                >
-                  Send Inquiry <Send size={16} />
-                </motion.button>
-              </form>
+              <ContactForm />
             </div>
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="py-12 border-t border-white/5">
-        <div className="container mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className="text-sm text-neutral-600 font-light tracking-wide">
-            © 2026 Anesuishe Muyambo. All rights reserved.
+      <footer className="py-24 bg-[#F8F7F3] border-t border-accent/10">
+        <div className="container mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6 text-black/40">
+          <div className="text-xs font-modern font-bold tracking-widest uppercase">
+            © 2026 Anesuishe Muyambo
           </div>
-          <div className="flex gap-8">
-            <a href="#" className="text-[10px] uppercase tracking-widest text-neutral-600 hover:text-white transition-colors">Privacy</a>
-            <a href="#" className="text-[10px] uppercase tracking-widest text-neutral-600 hover:text-white transition-colors">Terms</a>
-            <a href="#" className="text-[10px] uppercase tracking-widest text-neutral-600 hover:text-white transition-colors">Digital DNA</a>
+          <div className="flex gap-12">
+            <a href="#" className="text-[10px] uppercase tracking-widest font-bold hover:text-accent transition-colors">Privacy</a>
+            <a href="#" className="text-[10px] uppercase tracking-widest font-bold hover:text-accent transition-colors">Terms</a>
+            <a href="#" className="text-[10px] uppercase tracking-widest font-bold hover:text-accent transition-colors">Digital DNA</a>
           </div>
         </div>
       </footer>
