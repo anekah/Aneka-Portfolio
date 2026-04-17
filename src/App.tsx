@@ -1,7 +1,7 @@
 import React, { Suspense, useRef, useState, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Float, MeshDistortMaterial, Sphere, PerspectiveCamera, Environment, ContactShadows } from '@react-three/drei';
-import { motion, AnimatePresence, useScroll, useTransform, useSpring } from 'motion/react';
+import { motion, AnimatePresence, useScroll, useTransform, useSpring, useReducedMotion } from 'motion/react';
 import { 
   ArrowUpRight, 
   Twitter, 
@@ -57,7 +57,7 @@ function Scene() {
         <Sphere 
           ref={sphereRef} 
           args={[isMobile ? 0.8 : 1.2, 64, 64]} 
-          position={[isMobile ? 0 : 1.5, 0.5, 0]}
+          position={[isMobile ? 0 : 1.5, isMobile ? 0 : 0.5, 0]}
         >
           <MeshDistortMaterial
             color="#222"
@@ -82,6 +82,36 @@ function Scene() {
     </>
   );
 }
+
+// --- Constants & Variants ---
+
+const ANIMATION_VARIANTS = {
+  container: {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+        delayChildren: 0.2
+      }
+    }
+  },
+  item: {
+    hidden: { opacity: 0, y: 30 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.8,
+        ease: [0.22, 1, 0.36, 1] as const
+      }
+    }
+  },
+  fadeIn: {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1, transition: { duration: 1 } }
+  }
+};
 
 // --- UI Components ---
 
@@ -182,43 +212,49 @@ const ContactForm = () => {
     <form className="space-y-6" onSubmit={handleSubmit}>
       <div className="space-y-2">
         <label className="text-[10px] uppercase tracking-widest font-bold text-accent/40 ml-4">Full Name</label>
-        <input 
+        <motion.input 
+          whileFocus={{ scale: 1.01, borderColor: "rgba(109, 0, 26, 0.3)" }}
           name="name"
           type="text" 
           required
           placeholder="E.g. Alexander Knight"
-          className="w-full h-16 px-8 rounded-full bg-accent/5 border border-accent/10 text-black placeholder:text-black/20 focus:outline-none focus:border-accent/30 transition-colors"
+          className="w-full h-16 px-8 rounded-full bg-accent/5 border border-accent/10 text-black placeholder:text-black/20 focus:outline-none transition-all"
         />
       </div>
       <div className="space-y-2">
         <label className="text-[10px] uppercase tracking-widest font-bold text-accent/40 ml-4">Email Address</label>
-        <input 
+        <motion.input 
+          whileFocus={{ scale: 1.01, borderColor: "rgba(109, 0, 26, 0.3)" }}
           name="email"
           type="email" 
           required
           placeholder="alex@studio.com"
-          className="w-full h-16 px-8 rounded-full bg-accent/5 border border-accent/10 text-black placeholder:text-black/20 focus:outline-none focus:border-accent/30 transition-colors"
+          className="w-full h-16 px-8 rounded-full bg-accent/5 border border-accent/10 text-black placeholder:text-black/20 focus:outline-none transition-all"
         />
       </div>
       <div className="space-y-2">
         <label className="text-[10px] uppercase tracking-widest font-bold text-accent/40 ml-4">Brief Narrative</label>
-        <textarea 
+        <motion.textarea 
+          whileFocus={{ scale: 1.01, borderColor: "rgba(109, 0, 26, 0.3)" }}
           name="message"
           required
           placeholder="Tell me about your vision..."
-          className="w-full h-40 px-8 py-6 rounded-3xl bg-accent/5 border border-accent/10 text-black placeholder:text-black/20 focus:outline-none focus:border-accent/30 transition-colors resize-none"
+          className="w-full h-40 px-8 py-6 rounded-3xl bg-accent/5 border border-accent/10 text-black placeholder:text-black/20 focus:outline-none transition-all resize-none"
         />
       </div>
       
       <div className="relative">
         <motion.button 
           disabled={status === 'sending'}
-          whileHover={{ scale: 1.02 }}
+          whileHover={{ 
+            scale: 1.05,
+            boxShadow: "0 0 25px rgba(109, 0, 26, 0.25)"
+          }}
           whileTap={{ scale: 0.98 }}
           type="submit"
           className={cn(
-            "w-full h-16 rounded-full font-modern font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 transition-all",
-            status === 'sending' ? "bg-neutral-200 text-neutral-400 cursor-not-allowed" : "bg-accent text-white shadow-lg shadow-accent/20 hover:shadow-xl hover:shadow-accent/30"
+            "w-full h-16 rounded-full font-modern font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 transition-all duration-300",
+            status === 'sending' ? "bg-neutral-200 text-neutral-400 cursor-not-allowed" : "bg-accent text-white shadow-lg shadow-accent/20"
           )}
         >
           {status === 'sending' ? "Transmitting..." : "Send Inquiry"} <Send size={16} />
@@ -252,13 +288,16 @@ const ContactForm = () => {
 };
 
 export default function App() {
+  const shouldReduceMotion = useReducedMotion();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { scrollYProgress } = useScroll();
+  const { scrollY, scrollYProgress } = useScroll();
   const scaleX = useSpring(scrollYProgress, {
     stiffness: 100,
     damping: 30,
     restDelta: 0.001
   });
+
+  const logoOpacity = useTransform(scrollY, [0, 50], [1, 0]);
 
   const mouseX = useSpring(0, { stiffness: 50 });
   const mouseY = useSpring(0, { stiffness: 50 });
@@ -283,27 +322,31 @@ export default function App() {
       {/* Navigation */}
       <nav className="fixed top-0 left-0 w-full z-50 px-6 py-8 md:px-12 flex justify-between items-center bg-transparent">
         <motion.div 
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
+          style={{ opacity: logoOpacity }}
           className="text-xl font-modern font-black tracking-tighter text-accent cursor-pointer"
         >
           Anesuishe.
         </motion.div>
         
-        <div className="hidden md:flex gap-12 items-center">
+        <motion.div 
+          variants={ANIMATION_VARIANTS.container}
+          initial="hidden"
+          animate="visible"
+          className="hidden md:flex gap-12 items-center"
+        >
           {['About', 'Skills', 'Work', 'Connect'].map((item, idx) => (
             <motion.a 
               key={item}
               href={`#${item.toLowerCase()}`}
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.1 }}
-              className="text-[10px] uppercase tracking-[0.3em] font-black text-accent/60 hover:text-accent transition-colors"
+              variants={ANIMATION_VARIANTS.item}
+              whileHover={{ y: -2 }}
+              className="text-[10px] uppercase tracking-[0.3em] font-black text-accent/60 hover:text-accent transition-colors relative group"
             >
               {item}
+              <span className="absolute -bottom-1 left-0 w-0 h-[1px] bg-accent transition-all duration-300 group-hover:w-full" />
             </motion.a>
           ))}
-        </div>
+        </motion.div>
 
         <button 
           onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -359,17 +402,17 @@ export default function App() {
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-6">
             <div className="w-full flex flex-col md:flex-row justify-between items-center md:items-start gap-8 md:px-12 lg:px-24 pt-20 md:pt-0">
               <motion.div 
-                initial={{ opacity: 0, x: -50 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.5, duration: 1 }}
+                initial={{ opacity: 0, x: -50, filter: "blur(10px)" }}
+                animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
+                transition={{ duration: 1.5, ease: [0.22, 1, 0.36, 1], delay: 0.2 }}
                 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-modern font-black text-black uppercase tracking-tighter text-center md:text-left leading-[0.9]"
               >
                 Anesu<br/>ishe
               </motion.div>
               <motion.div 
-                initial={{ opacity: 0, x: 50 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.7, duration: 1 }}
+                initial={{ opacity: 0, x: 50, filter: "blur(10px)" }}
+                animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
+                transition={{ duration: 1.5, ease: [0.22, 1, 0.36, 1], delay: 0.4 }}
                 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-modern font-black text-black uppercase tracking-tighter text-center md:text-right leading-[0.9]"
               >
                 Muya<br/>mbo
@@ -416,42 +459,35 @@ export default function App() {
               </p>
             </div>
 
-            <div className="mt-24 pt-16 border-t border-accent/10 grid grid-cols-2 lg:grid-cols-3 gap-12 md:gap-16">
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: 0.2 }}
-              >
+            <motion.div 
+              variants={ANIMATION_VARIANTS.container}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              className="mt-24 pt-16 border-t border-accent/10 grid grid-cols-2 lg:grid-cols-3 gap-12 md:gap-16"
+            >
+              <motion.div variants={ANIMATION_VARIANTS.item}>
                 <h4 className="text-accent text-5xl sm:text-6xl font-display font-black leading-none mb-3">
                   <AnimatedCounter value={50} suffix="+" />
                 </h4>
                 <p className="text-[11px] uppercase tracking-[0.4em] font-black text-black/40">Brands Scaled</p>
               </motion.div>
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: 0.3 }}
-              >
+              <motion.div variants={ANIMATION_VARIANTS.item}>
                 <h4 className="text-accent text-5xl sm:text-6xl font-display font-black leading-none mb-3">
                   <AnimatedCounter value={3.2} suffix="x" />
                 </h4>
                 <p className="text-[11px] uppercase tracking-[0.4em] font-black text-black/40">Average ROAS</p>
               </motion.div>
               <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: 0.4 }}
+                variants={ANIMATION_VARIANTS.item}
                 className="col-span-2 lg:col-span-1"
               >
                 <h4 className="text-accent text-5xl sm:text-6xl font-display font-black leading-none mb-3">
-                  <AnimatedCounter value={100} suffix="k+" />
+                  R<AnimatedCounter value={250} suffix="k+" />
                 </h4>
                 <p className="text-[11px] uppercase tracking-[0.4em] font-black text-black/40">Revenue Generated</p>
               </motion.div>
-            </div>
+            </motion.div>
           </motion.div>
         </div>
       </section>
@@ -467,27 +503,61 @@ export default function App() {
             Skills
           </motion.h2>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-w-6xl mx-auto">
-            <p className="col-span-full mockup-heading text-2xl text-accent mb-8">What I Bring</p>
-            {[
-              "SEO / SEM",
-              "Google Ads",
-              "Meta Ads",
-              "Email Marketing",
-              "Content Strategy",
-              "Social Media",
-              "Google Analytics",
-              "Copywriting",
-              "Marketing Auto.",
-              "A/B Testing",
-              "Brand Strategy",
-              "Social Media Management"
-            ].map(skill => (
-              <div key={skill} className="bg-white border border-accent/10 py-6 px-8 rounded-2xl font-modern font-bold uppercase tracking-widest text-[11px] text-accent hover:bg-accent hover:text-white transition-all duration-300 cursor-default">
-                {skill}
+          <motion.div 
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
+            className="max-w-6xl mx-auto"
+          >
+            <p className="mockup-heading text-2xl text-accent mb-12">Proficiency</p>
+            <div className="grid md:grid-cols-2 gap-x-16 gap-y-12">
+              {[
+                { name: "SEO / SEM", val: 95 },
+                { name: "Google & Meta Ads", val: 98 },
+                { name: "Email Marketing", val: 92 },
+                { name: "Content Strategy", val: 90 },
+                { name: "Google Analytics", val: 94 },
+                { name: "Marketing Auto.", val: 88 },
+                { name: "Brand Strategy", val: 91 },
+                { name: "Social Management", val: 96 }
+              ].map((skill, idx) => (
+                <motion.div 
+                  key={skill.name} 
+                  initial={{ opacity: 0, x: -20 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: idx * 0.1, duration: 0.8 }}
+                  className="group"
+                >
+                  <div className="flex justify-between items-end mb-4">
+                    <span className="font-modern font-black uppercase tracking-widest text-xs text-black/60 group-hover:text-accent transition-colors">{skill.name}</span>
+                    <span className="font-display font-black text-accent text-xl">{skill.val}%</span>
+                  </div>
+                  <div className="h-1 w-full bg-accent/5 rounded-full overflow-hidden">
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      whileInView={{ width: `${skill.val}%` }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 1.5, delay: idx * 0.1, ease: [0.22, 1, 0.36, 1] }}
+                      className="h-full bg-accent"
+                    />
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+
+            <div className="mt-20 pt-20 border-t border-accent/10">
+              <p className="mockup-heading text-2xl text-accent mb-10">Also Mastering</p>
+              <div className="flex flex-wrap gap-3">
+                {["Copywriting", "A/B Testing", "Conversion Optimization", "Influence Marketing", "Market Research", "CRM Management"].map(skill => (
+                  <span key={skill} className="px-5 py-2 border border-accent/10 rounded-full font-modern font-bold uppercase tracking-widest text-[9px] text-accent/60">
+                    {skill}
+                  </span>
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
+          </motion.div>
         </div>
       </section>
 
@@ -503,7 +573,13 @@ export default function App() {
             <p className="text-accent/60 font-modern font-black uppercase tracking-[0.4em] text-xs mt-4">Selected Projects</p>
           </motion.div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
+          <motion.div 
+            variants={ANIMATION_VARIANTS.container}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-100px" }}
+            className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto"
+          >
             {[
               {
                 title: "Woolworths SA — Social Campaign",
@@ -562,20 +638,15 @@ export default function App() {
             ].map((project, idx) => (
               <motion.div 
                 key={idx}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: idx * 0.1 }}
+                variants={ANIMATION_VARIANTS.item}
+                whileHover={{ y: -10, transition: { duration: 0.4 } }}
                 className="bg-white border border-accent/10 rounded-[2rem] overflow-hidden group shadow-lg shadow-accent/5 hover:shadow-xl hover:shadow-accent/10 transition-all duration-500 flex flex-col h-full"
               >
                 <div className="p-10 flex flex-col h-full">
-                  <div className="mb-6 flex items-start justify-between">
+                  <div className="mb-6">
                     <h3 className="text-2xl font-display font-black text-black leading-tight group-hover:text-accent transition-colors">
                       {project.title.split(' — ')[0]}
                     </h3>
-                    <div className="w-10 h-10 rounded-full border border-accent/10 flex items-center justify-center group-hover:bg-accent group-hover:text-white transition-all">
-                      <ArrowUpRight size={20} />
-                    </div>
                   </div>
                   <p className="text-[11px] font-modern font-black uppercase tracking-[0.3em] text-accent/40 mb-6">{project.tags}</p>
                   <p className="text-black/60 text-base font-medium leading-relaxed mb-8 flex-grow">
@@ -588,7 +659,7 @@ export default function App() {
                 </div>
               </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
       </section>
 
